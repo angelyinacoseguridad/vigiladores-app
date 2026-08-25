@@ -1,0 +1,2567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Vigiladores - Seguridad Privada</title>
+  <!-- SDK de Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js">
+  </script>
+  <!-- Librería para leer Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+  </script>
+  <style>
+    /* ---------- RESET Y BASE ---------- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #eef2f7;
+      color: #1e2a3a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      width: 90%;
+      max-width: 500px;
+      pointer-events: none;
+    }
+    .toast {
+      background: #1e2a3a;
+      color: #fff;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      animation: slideDown 0.3s ease;
+      pointer-events: auto;
+      border-left: 6px solid #1f8b4c;
+    }
+    .toast.error {
+      border-left-color: #b91c1c;
+      background: #2d1a1a;
+    }
+    .toast .toast-icon {
+      font-size: 1.4rem;
+    }
+    .toast .toast-msg {
+      flex: 1;
+    }
+    .toast .toast-close {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 0 0.2rem;
+    }
+    .toast .toast-close:hover {
+      color: #fff;
+    }
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    /* ---------- HEADER ---------- */
+    .header {
+      background: #0b2b4a;
+      color: white;
+      padding: 1.2rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+    .header h1 span {
+      font-weight: 600;
+    }
+    .header .acciones {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .header .btn-agregar,
+    .header .btn-importar,
+    .header .btn-importar-suspensiones {
+      border: none;
+      color: white;
+      padding: 0.6rem 1.8rem;
+      border-radius: 30px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .header .btn-agregar {
+      background: #1f8b4c;
+    }
+    .header .btn-agregar:hover {
+      background: #16733d;
+    }
+    .header .btn-importar {
+      background: #2d6b8f;
+    }
+    .header .btn-importar:hover {
+      background: #1f5577;
+    }
+    .header .btn-importar-suspensiones {
+      background: #b85a2d;
+    }
+    .header .btn-importar-suspensiones:hover {
+      background: #9e4a23;
+    }
+    /* ---------- CONTENEDOR ---------- */
+    .main-container {
+      display: flex;
+      flex: 1;
+      padding: 2rem;
+      gap: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .lista-container {
+      flex: 1;
+      min-width: 320px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      padding: 1.5rem;
+      height: fit-content;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .lista-container h2 {
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      color: #0b2b4a;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .lista-container h2 .spinner-small {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #1f8b4c;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .lista-container h2 .spinner-small.visible {
+      display: inline-block;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    .buscador-filtros {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .buscador-filtros .fila-superior {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+    }
+    .buscador-filtros .fila-superior input {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      border: 1px solid #d1d9e6;
+      border-radius: 30px;
+      font-size: 0.95rem;
+      background: white;
+    }
+    .buscador-filtros .fila-superior input:focus {
+      outline: none;
+      border-color: #1f8b4c;
+      box-shadow: 0 0 0 3px rgba(31, 139, 76, 0.15);
+    }
+    .buscador-filtros .fila-superior .btn-limpiar {
+      background: #e2e8f0;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .buscador-filtros .fila-superior .btn-limpiar:hover {
+      background: #cbd5e1;
+    }
+    .buscador-filtros .btn-filtros {
+      background: #0b2b4a;
+      color: white;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+      align-self: flex-start;
+    }
+    .buscador-filtros .btn-filtros:hover {
+      background: #1a405e;
+    }
+    .panel-filtros {
+      display: none;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .panel-filtros.visible {
+      display: flex;
+    }
+    .panel-filtros .grupo-filtro {
+      flex: 1 1 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .panel-filtros .grupo-filtro label {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #2d3f57;
+    }
+    .panel-filtros .grupo-filtro input,
+    .panel-filtros .grupo-filtro select {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #d1d9e6;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: white;
+      width: 100%;
+    }
+    .panel-filtros .grupo-filtro input:focus,
+    .panel-filtros .grupo-filtro select:focus {
+      outline: none;
+      border-color: #1f8b4c;
+      box-shadow: 0 0 0 2px rgba(31, 139, 76, 0.15);
+    }
+    .panel-filtros .grupo-filtro .rango-fechas {
+      display: flex;
+      gap: 0.3rem;
+      align-items: center;
+    }
+    .panel-filtros .grupo-filtro .rango-fechas input {
+      flex: 1;
+      min-width: 80px;
+    }
+    .panel-filtros .btn-aplicar-filtros {
+      background: #1f8b4c;
+      color: white;
+      border: none;
+      padding: 0.5rem 1.5rem;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.15s;
+      align-self: flex-end;
+      margin-top: 0.5rem;
+    }
+    .panel-filtros .btn-aplicar-filtros:hover {
+      background: #16733d;
+    }
+    .lista-vigilantes {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .item-vigilante {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      transition: background 0.15s, transform 0.1s;
+      border-left: 4px solid #1f8b4c;
+      cursor: pointer;
+      gap: 0.8rem;
+    }
+    .item-vigilante:hover {
+      background: #eef2f7;
+      transform: translateX(4px);
+    }
+    .item-vigilante .avatar-mini {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #d1d9e6;
+      flex-shrink: 0;
+    }
+    .item-vigilante .info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+    .item-vigilante .info .nombre {
+      font-weight: 600;
+      font-size: 1rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-vigilante .info .dni {
+      font-size: 0.85rem;
+      color: #4a5a6e;
+    }
+    .item-vigilante .info .sanciones-badge {
+      font-size: 0.7rem;
+      background: #b85a2d;
+      color: white;
+      padding: 0.1rem 0.6rem;
+      border-radius: 20px;
+      display: inline-block;
+      margin-top: 0.1rem;
+      width: fit-content;
+    }
+    .item-vigilante .acciones {
+      display: flex;
+      gap: 0.3rem;
+      flex-shrink: 0;
+    }
+    .item-vigilante .acciones button {
+      border: none;
+      background: transparent;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .item-vigilante .acciones .btn-editar {
+      color: #1f6b8f;
+    }
+    .item-vigilante .acciones .btn-editar:hover {
+      background: #d4e2ed;
+    }
+    .item-vigilante .acciones .btn-eliminar {
+      color: #b91c1c;
+    }
+    .item-vigilante .acciones .btn-eliminar:hover {
+      background: #fad5d5;
+    }
+    .sin-datos {
+      color: #6b7a8f;
+      text-align: center;
+      padding: 2rem 0;
+      font-style: italic;
+    }
+    /* ---------- MODALES ---------- */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal-overlay.visible {
+      display: flex;
+    }
+    .modal {
+      background: white;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 960px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp {
+      from {
+        transform: translateY(40px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    .modal-header {
+      background: #0b2b4a;
+      color: white;
+      padding: 1.2rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .modal-header h2 {
+      font-weight: 300;
+      font-size: 1.4rem;
+      margin: 0;
+    }
+    .modal-header .btn-cerrar {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.8rem;
+      cursor: pointer;
+      line-height: 1;
+      transition: transform 0.15s;
+    }
+    .modal-header .btn-cerrar:hover {
+      transform: rotate(90deg);
+    }
+    .modal-body {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.3rem;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #4a5a6e;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.15s;
+      border-radius: 8px 8px 0 0;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      background: #f1f5f9;
+    }
+    .tab-btn.activo {
+      color: #0b2b4a;
+      border-bottom-color: #1f8b4c;
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+    .tab-panel {
+      display: none;
+      animation: fadeIn 0.2s;
+    }
+    .tab-panel.activo {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem 2rem;
+    }
+    .form-grid .full {
+      grid-column: 1 / -1;
+    }
+    .form-grid .foto-perfil {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .form-grid .foto-perfil img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #d1d9e6;
+      border: 3px solid #e2e8f0;
+    }
+    .form-grid .foto-perfil input[type="file"] {
+      display: none;
+    }
+    .campo {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .campo label {
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #2d3f57;
+    }
+    .campo input,
+    .campo select,
+    .campo textarea {
+      padding: 0.6rem 0.8rem;
+      border: 1px solid #d1d9e6;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: border 0.15s, box-shadow 0.15s;
+      background: white;
+      width: 100%;
+    }
+    .campo input:focus,
+    .campo select:focus,
+    .campo textarea:focus {
+      outline: none;
+      border-color: #1f8b4c;
+      box-shadow: 0 0 0 3px rgba(31, 139, 76, 0.15);
+    }
+    .campo textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    .campo input[type="date"] {
+      max-width: 200px;
+    }
+    .sub-lista {
+      margin-top: 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.8rem;
+      background: #fafcff;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .sub-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.4rem 0.2rem;
+      border-bottom: 1px solid #edf2f7;
+      font-size: 0.9rem;
+    }
+    .sub-item:last-child {
+      border-bottom: none;
+    }
+    .sub-item .btn-remover {
+      background: none;
+      border: none;
+      color: #b91c1c;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0 0.4rem;
+    }
+    .btn-agregar-item {
+      background: #e2e8f0;
+      border: none;
+      padding: 0.3rem 1.2rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-top: 0.3rem;
+      transition: background 0.15s;
+      color: #1e2a3a;
+    }
+    .btn-agregar-item:hover {
+      background: #cbd5e1;
+    }
+    .fila-item {
+      display: flex;
+      gap: 0.8rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 0.4rem;
+    }
+    .fila-item input,
+    .fila-item select {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #d1d9e6;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      flex: 1;
+      min-width: 100px;
+    }
+    .modal-footer {
+      padding: 1rem 2rem;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .modal-footer button {
+      padding: 0.6rem 2rem;
+      border: none;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      min-width: 120px;
+    }
+    .modal-footer .btn-guardar {
+      background: #1f8b4c;
+      color: white;
+    }
+    .modal-footer .btn-guardar:hover:not(:disabled) {
+      background: #16733d;
+      transform: scale(1.02);
+    }
+    .modal-footer .btn-guardar:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .modal-footer .btn-cancelar {
+      background: #e2e8f0;
+      color: #1e2a3a;
+    }
+    .modal-footer .btn-cancelar:hover {
+      background: #cbd5e1;
+    }
+    .import-area {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .import-area .file-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .import-area .file-input-wrapper input[type="file"] {
+      flex: 1;
+    }
+    .import-area .file-input-wrapper button {
+      background: #1f8b4c;
+      color: white;
+      border: none;
+      padding: 0.5rem 1.5rem;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .import-area .file-input-wrapper button:hover {
+      background: #16733d;
+    }
+    .import-area .file-input-wrapper button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .import-preview {
+      max-height: 300px;
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.5rem;
+      background: #fafcff;
+    }
+    .import-preview table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .import-preview th,
+    .import-preview td {
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid #edf2f7;
+      text-align: left;
+    }
+    .import-preview th {
+      background: #eef2f7;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .import-preview .sin-datos {
+      padding: 1rem;
+      text-align: center;
+    }
+    .import-resumen {
+      background: #f0f7ff;
+      border-radius: 8px;
+      padding: 0.8rem 1.2rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      font-weight: 500;
+    }
+    .import-resumen span {
+      color: #0b2b4a;
+    }
+    .import-resumen .count {
+      font-weight: 700;
+      color: #1f8b4c;
+    }
+    .import-resumen .error-count {
+      font-weight: 700;
+      color: #b91c1c;
+    }
+    .disciplina-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .disciplina-table th,
+    .disciplina-table td {
+      border: 1px solid #e2e8f0;
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+    }
+    .disciplina-table th {
+      background: #eef2f7;
+      font-weight: 600;
+    }
+    .disciplina-table .btn-eliminar-sancion {
+      background: none;
+      border: none;
+      color: #b91c1c;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .disciplina-form {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-top: 1rem;
+    }
+    .disciplina-form .campo {
+      flex: 1 1 150px;
+    }
+    .disciplina-form .campo label {
+      font-size: 0.8rem;
+    }
+    .disciplina-form .btn-agregar-item {
+      margin-top: 0;
+      padding: 0.4rem 1.2rem;
+    }
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+        padding: 1rem;
+      }
+      .header .acciones {
+        justify-content: center;
+      }
+      .main-container {
+        flex-direction: column;
+        padding: 1rem;
+      }
+      .lista-container {
+        max-height: none;
+        min-width: unset;
+      }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      .modal {
+        max-width: 100%;
+        border-radius: 12px;
+        max-height: 95vh;
+      }
+      .modal-header {
+        padding: 1rem;
+      }
+      .modal-body {
+        padding: 1rem;
+      }
+      .modal-footer {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .modal-footer button {
+        width: 100%;
+      }
+      .tabs {
+        gap: 0.2rem;
+      }
+      .tab-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+      }
+      .campo input[type="date"] {
+        max-width: 100%;
+      }
+      .form-grid .foto-perfil img {
+        width: 80px;
+        height: 80px;
+      }
+      .panel-filtros .grupo-filtro {
+        flex: 1 1 100%;
+      }
+      .import-area .file-input-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .import-preview table {
+        font-size: 0.7rem;
+      }
+      .import-preview th,
+      .import-preview td {
+        padding: 0.2rem 0.3rem;
+      }
+      .disciplina-table {
+        font-size: 0.75rem;
+      }
+      .disciplina-form {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #bcc8d8;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0b0c4;
+    }
+    .spinner-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      z-index: 3000;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(2px);
+    }
+    .spinner-overlay.visible {
+      display: flex;
+    }
+    .spinner-overlay .spinner {
+      width: 50px;
+      height: 50px;
+      border: 6px solid #e2e8f0;
+      border-top: 6px solid #1f8b4c;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOAST -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- SPINNER GLOBAL -->
+  <div class="spinner-overlay" id="spinnerGlobal">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <h1>🛡️ <span>Vigiladores</span> · Seguridad Privada</h1>
+    <div class="acciones">
+      <button class="btn-agregar" id="btnAgregar">➕ Nuevo Vigilador</button>
+      <button class="btn-importar" id="btnImportar">📥 Importar Altas</button>
+      <button class="btn-importar-suspensiones" id="btnImportarSuspensiones">📥 Importar Suspensiones</button>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="main-container">
+    <section class="lista-container">
+      <h2>
+        📋 Lista de Vigiladores
+        <span class="spinner-small" id="spinnerLista"></span>
+      </h2>
+
+      <div class="buscador-filtros">
+        <div class="fila-superior">
+          <input type="text" id="buscadorInput" placeholder="🔍 Buscar por nombre, apellido o DNI">
+          <button class="btn-limpiar" id="btnLimpiarBusqueda">✖</button>
+        </div>
+        <button class="btn-filtros" id="btnToggleFiltros">⚙️ Filtros avanzados</button>
+        <div class="panel-filtros" id="panelFiltros">
+          <div class="grupo-filtro">
+            <label>Habilitaciones</label>
+            <select id="filtroTipoHab"><option value="">Tipo</option><option value="Legajo PS">Legajo PS</option><option value="Matrícula">Matrícula</option><option value="Certificado">Certificado</option></select>
+            <input type="text" id="filtroNumHab" placeholder="Número">
+            <input type="text" id="filtroOrganismo" placeholder="Organismo">
+            <div class="rango-fechas">
+              <input type="date" id="filtroVencDesde" placeholder="Venc desde">
+              <span>a</span>
+              <input type="date" id="filtroVencHasta" placeholder="Venc hasta">
+            </div>
+          </div>
+          <div class="grupo-filtro">
+            <label>Datos Laborales</label>
+            <select id="filtroCategoria"><option value="">Categoría</option><option value="Vigilador">Vigilador</option><option value="Vigilador Senior">Vigilador Senior</option><option value="Supervisor">Supervisor</option><option value="Jefe de Seguridad">Jefe de Seguridad</option></select>
+            <input type="text" id="filtroObraSocial" placeholder="Obra Social">
+            <input type="text" id="filtroSindicato" placeholder="Sindicato">
+            <input type="text" id="filtroBanco" placeholder="Banco">
+            <input type="text" id="filtroCUIL" placeholder="CUIL">
+          </div>
+          <div class="grupo-filtro">
+            <label>Ropa de Trabajo</label>
+            <input type="text" id="filtroTallaCamisa" placeholder="Talla Camisa">
+            <input type="text" id="filtroTallaPantalon" placeholder="Talla Pantalón">
+            <input type="text" id="filtroTallaCalzado" placeholder="Talla Calzado">
+            <input type="text" id="filtroTipoPrenda" placeholder="Tipo de prenda">
+            <div class="rango-fechas">
+              <input type="date" id="filtroEntregaDesde" placeholder="Entrega desde">
+              <span>a</span>
+              <input type="date" id="filtroEntregaHasta" placeholder="Entrega hasta">
+            </div>
+          </div>
+          <div class="grupo-filtro">
+            <label>RR.HH.</label>
+            <input type="text" id="filtroObservaciones" placeholder="Observaciones">
+            <input type="text" id="filtroEvaluaciones" placeholder="Evaluación">
+          </div>
+          <button class="btn-aplicar-filtros" id="btnAplicarFiltros">Aplicar filtros</button>
+        </div>
+      </div>
+
+      <div id="listaVigilantes" class="lista-vigilantes">
+        <!-- Se llena dinámicamente -->
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL DE EDICIÓN / NUEVO -->
+  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitulo">Vigilador</h2>
+        <button class="btn-cerrar" id="btnCerrarModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="tabs" id="tabsContainer">
+          <button class="tab-btn activo" data-tab="tabPersonal">Datos Personales</button>
+          <button class="tab-btn" data-tab="tabHabilitaciones">Habilitaciones</button>
+          <button class="tab-btn" data-tab="tabLaboral">Datos Laborales</button>
+          <button class="tab-btn" data-tab="tabRopa">Ropa de Trabajo</button>
+          <button class="tab-btn" data-tab="tabRRHH">RR.HH.</button>
+          <button class="tab-btn" data-tab="tabDisciplina">Disciplina</button>
+        </div>
+
+        <!-- Personal -->
+        <div class="tab-panel activo" id="tabPersonal">
+          <div class="form-grid">
+            <div class="campo"><label for="inputNombre">Nombre *</label><input type="text" id="inputNombre" placeholder="Nombre"></div>
+            <div class="campo"><label for="inputApellido">Apellido *</label><input type="text" id="inputApellido" placeholder="Apellido"></div>
+            <div class="campo"><label for="inputDNI">DNI *</label><input type="text" id="inputDNI" placeholder="20123456"></div>
+            <div class="campo"><label for="inputFechaNac">Fecha de Nacimiento</label><input type="date" id="inputFechaNac"></div>
+            <div class="campo"><label for="inputEstadoCivil">Estado Civil</label><input type="text" id="inputEstadoCivil" placeholder="Soltero, Casado, etc."></div>
+            <div class="campo"><label for="inputNombreMadre">Nombre de la Madre</label><input type="text" id="inputNombreMadre" placeholder="Nombre de la madre"></div>
+            <div class="campo"><label for="inputNombrePadre">Nombre del Padre</label><input type="text" id="inputNombrePadre" placeholder="Nombre del padre"></div>
+            <div class="campo"><label for="inputDomicilio">Domicilio</label><input type="text" id="inputDomicilio" placeholder="Calle y número"></div>
+            <div class="campo"><label for="inputCodigoPostal">Código Postal</label><input type="text" id="inputCodigoPostal" placeholder="Código postal"></div>
+            <div class="campo"><label for="inputTelefono">Teléfono</label><input type="tel" id="inputTelefono" placeholder="+54 9 11 1234-5678"></div>
+            <div class="campo"><label for="inputEmail">Email</label><input type="email" id="inputEmail" placeholder="email@ejemplo.com"></div>
+            <div class="campo foto-perfil full">
+              <label>Foto de perfil</label>
+              <img id="fotoPreview" src="" alt="Foto de perfil">
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center; margin-top:0.5rem;">
+                <button type="button" id="btnSeleccionarFoto" class="btn-agregar-item" style="background:#1f8b4c; color:white; padding:0.4rem 1.2rem; cursor:pointer; border:none; font-size:0.95rem;">📸 Seleccionar foto</button>
+                <input type="file" id="inputFoto" accept="image/*" style="display:none;">
+                <button type="button" id="btnQuitarFoto" class="btn-agregar-item" style="background:#fad5d5; padding:0.4rem 1.2rem; cursor:pointer; border:none; font-size:0.95rem;">Quitar foto</button>
+              </div>
+              <small style="color:#6b7a8f; font-size:0.8rem;">JPG, PNG, GIF.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Habilitaciones -->
+        <div class="tab-panel" id="tabHabilitaciones">
+          <div class="form-grid">
+            <div class="campo"><label for="inputTipoHabilitacion">Tipo</label><select id="inputTipoHabilitacion"><option value="Legajo PS">Legajo PS</option><option value="Matrícula">Matrícula</option><option value="Certificado">Certificado</option></select></div>
+            <div class="campo"><label for="inputNumHabilitacion">Número</label><input type="text" id="inputNumHabilitacion" placeholder="Número"></div>
+            <div class="campo"><label for="inputFechaVencHabilitacion">Fecha de Vencimiento</label><input type="date" id="inputFechaVencHabilitacion"></div>
+            <div class="campo"><label for="inputOrganismo">Organismo</label><input type="text" id="inputOrganismo" placeholder="Ministerio de Seguridad"></div>
+          </div>
+        </div>
+
+        <!-- Laboral -->
+        <div class="tab-panel" id="tabLaboral">
+          <div class="form-grid">
+            <div class="campo"><label for="inputLegajo">Nº Legajo</label><input type="text" id="inputLegajo" placeholder="Legajo"></div>
+            <div class="campo"><label for="inputFechaIngreso">Fecha de Ingreso</label><input type="date" id="inputFechaIngreso"></div>
+            <div class="campo"><label for="inputCategoria">Categoría</label><select id="inputCategoria"><option value="Vigilador">Vigilador</option><option value="Vigilador Senior">Vigilador Senior</option><option value="Supervisor">Supervisor</option><option value="Jefe de Seguridad">Jefe de Seguridad</option></select></div>
+            <div class="campo"><label for="inputHorario">Horario</label><input type="text" id="inputHorario" placeholder="L-V 8-16"></div>
+            <div class="campo"><label for="inputObraSocial">Obra Social</label><input type="text" id="inputObraSocial" placeholder="Obra Social"></div>
+            <div class="campo"><label for="inputSindicato">Sindicato</label><input type="text" id="inputSindicato" placeholder="Sindicato"></div>
+            <div class="campo"><label for="inputCUIL">CUIL</label><input type="text" id="inputCUIL" placeholder="20-12345678-9"></div>
+            <div class="campo"><label for="inputBanco">Banco</label><input type="text" id="inputBanco" placeholder="Banco"></div>
+            <div class="campo"><label for="inputNumCuenta">Número de Cuenta</label><input type="text" id="inputNumCuenta" placeholder="Cuenta"></div>
+            <div class="campo"><label for="inputCBU">CBU</label><input type="text" id="inputCBU" placeholder="CBU"></div>
+          </div>
+        </div>
+
+        <!-- Ropa -->
+        <div class="tab-panel" id="tabRopa">
+          <div class="form-grid">
+            <div class="campo"><label for="inputTallaCamisa">Talla Camisa</label><input type="text" id="inputTallaCamisa" placeholder="M, L, XL"></div>
+            <div class="campo"><label for="inputTallaPantalon">Talla Pantalón</label><input type="text" id="inputTallaPantalon" placeholder="42, 44"></div>
+            <div class="campo"><label for="inputTallaCalzado">Talla Calzado</label><input type="text" id="inputTallaCalzado" placeholder="42, 43"></div>
+            <div class="campo full">
+              <label>Entregas de Ropa</label>
+              <div id="entregasContainer">
+                <div class="sub-lista" id="listaEntregas"></div>
+                <div class="fila-item">
+                  <input type="date" id="inputEntregaFecha" placeholder="Fecha">
+                  <input type="text" id="inputEntregaTipo" placeholder="Tipo (Camisa, etc.)">
+                  <button class="btn-agregar-item" id="btnAgregarEntrega">Agregar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RRHH -->
+        <div class="tab-panel" id="tabRRHH">
+          <div class="form-grid">
+            <div class="campo full"><label for="inputObservaciones">Observaciones</label><textarea id="inputObservaciones" rows="3" placeholder="Observaciones..."></textarea></div>
+            <div class="campo full">
+              <label>Evaluaciones</label>
+              <div id="evaluacionesContainer">
+                <div class="sub-lista" id="listaEvaluaciones"></div>
+                <div class="fila-item">
+                  <input type="date" id="inputEvalFecha" placeholder="Fecha">
+                  <input type="text" id="inputEvalNota" placeholder="Nota / Comentario">
+                  <button class="btn-agregar-item" id="btnAgregarEvaluacion">Agregar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disciplina -->
+        <div class="tab-panel" id="tabDisciplina">
+          <h3 style="margin-bottom:0.5rem;">Historial de Sanciones</h3>
+          <div id="disciplinaLista"></div>
+          <div style="margin-top:1.5rem; border-top:1px solid #e2e8f0; padding-top:1rem;">
+            <h4>Agregar sanción</h4>
+            <div class="disciplina-form">
+              <div class="campo"><label for="inputSanFecha">Fecha</label><input type="date" id="inputSanFecha"></div>
+              <div class="campo"><label for="inputSanDias">Días / Apercibimiento</label><input type="text" id="inputSanDias" placeholder="Ej: 2, APERCIBIMIENTO"></div>
+              <div class="campo"><label for="inputSanServicio">Servicio</label><input type="text" id="inputSanServicio" placeholder="Ej: DOCK14"></div>
+              <div class="campo" style="flex:2;"><label for="inputSanMotivo">Motivo</label><input type="text" id="inputSanMotivo" placeholder="Descripción"></div>
+              <button class="btn-agregar-item" id="btnAgregarSancion" style="background:#1f8b4c; color:white; border:none;">Agregar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancelar" id="btnCancelarModal">Cancelar</button>
+        <button class="btn-guardar" id="btnGuardarModal">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL IMPORTAR ALTAS -->
+  <div class="modal-overlay" id="modalImportarOverlay" role="dialog" aria-modal="true" aria-labelledby="modalImportarTitulo">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalImportarTitulo">📥 Importar desde Excel (Altas)</h2>
+        <button class="btn-cerrar" id="btnCerrarImportar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="import-area">
+          <p>Selecciona un archivo Excel (.xlsx o .xls) con la hoja <strong>"ALTAS"</strong>.</p>
+          <div class="file-input-wrapper">
+            <input type="file" id="fileInputAltas" accept=".xlsx,.xls" />
+            <button id="btnProcesarAltas" disabled>Procesar archivo</button>
+          </div>
+          <div id="importResumenAltas" class="import-resumen" style="display:none;"></div>
+          <div id="importPreviewAltas" class="import-preview">
+            <div class="sin-datos">Selecciona un archivo para previsualizar.</div>
+          </div>
+          <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.5rem;">
+            <button class="btn-cancelar" id="btnCancelarImportarAltas">Cancelar</button>
+            <button class="btn-guardar" id="btnConfirmarImportarAltas" style="display:none;">Confirmar importación</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL IMPORTAR SUSPENSIONES -->
+  <div class="modal-overlay" id="modalImportarSuspensionesOverlay" role="dialog" aria-modal="true" aria-labelledby="modalImportarSuspensionesTitulo">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalImportarSuspensionesTitulo">📥 Importar Suspensiones</h2>
+        <button class="btn-cerrar" id="btnCerrarImportarSuspensiones">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="import-area">
+          <p>Selecciona el archivo Excel de suspensiones. Cada hoja debe corresponder a un vigilante (nombre de hoja = apellido y nombre).</p>
+          <div class="file-input-wrapper">
+            <input type="file" id="fileInputSuspensiones" accept=".xlsx,.xls" />
+            <button id="btnProcesarSuspensiones" disabled>Procesar archivo</button>
+          </div>
+          <div id="importResumenSuspensiones" class="import-resumen" style="display:none;"></div>
+          <div id="importPreviewSuspensiones" class="import-preview">
+            <div class="sin-datos">Selecciona un archivo para previsualizar.</div>
+          </div>
+          <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.5rem;">
+            <button class="btn-cancelar" id="btnCancelarImportarSuspensiones">Cancelar</button>
+            <button class="btn-guardar" id="btnConfirmarImportarSuspensiones" style="display:none;">Confirmar importación</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== JAVASCRIPT ============================== -->
+  <script>
+    (function() {
+      'use strict';
+
+      // ---------- CONFIGURACIÓN DE FIREBASE ----------
+      // 🔥 REEMPLAZA ESTE OBJETO CON EL QUE COPIAS DE FIREBASE 🔥
+      const firebaseConfig = {
+        apiKey: "AIzaSyBrJ_0NI4MpM3GWUpEilSLzrASc9d9Cgr4",
+        authDomain: "gestion-de-vigiladores.firebaseapp.com",
+        projectId: "gestion-de-vigiladores",
+        storageBucket: "gestion-de-vigiladores.firebasestorage.app",
+        messagingSenderId: "770265445229",
+        appId: "1:770265445229:web:73c646f35b1a97e75c2064"
+      };
+
+      // Inicializar Firebase
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      // ---------- DATOS DE EJEMPLO (para la primera carga) ----------
+      const DATOS_EJEMPLO = [{
+        datosPersonales: {
+          nombre: 'Juan',
+          apellido: 'Pérez',
+          dni: '20123456',
+          fechaNac: '1980-05-15',
+          domicilio: 'Av. Rivadavia 1234, CABA',
+          codigoPostal: '1000',
+          telefono: '+54 9 11 2345-6789',
+          email: 'juan.perez@seguridad.com',
+          estadoCivil: 'Soltero',
+          nombreMadre: 'María Pérez',
+          nombrePadre: 'José Pérez',
+          foto: ''
+        },
+        habilitaciones: { tipo: 'Legajo PS', numero: 'PS-12345', fechaVenc: '2026-12-31',
+          organismo: 'Ministerio de Seguridad' },
+        datosLaborales: {
+          legajo: '001',
+          fechaIngreso: '2015-03-01',
+          categoria: 'Vigilador Senior',
+          horario: 'L-V 08:00-16:00',
+          obraSocial: 'OSDE',
+          sindicato: 'SUTEP',
+          cuil: '20-12345678-9',
+          banco: 'Banco Nación',
+          numCuenta: '123456789',
+          cbu: '1234567890123456789012'
+        },
+        ropa: { tallaCamisa: 'XL', tallaPantalon: '44', tallaCalzado: '43', entregas: [{ fecha: '2024-01-10',
+            tipo: 'Camisa' }, { fecha: '2024-01-10', tipo: 'Pantalón' }, { fecha: '2024-06-15', tipo: 'Calzado' }] },
+        rrhh: { observaciones: 'Excelente desempeño.', evaluaciones: [{ fecha: '2024-01-20', nota: 'Muy bueno' },
+          { fecha: '2024-07-15', nota: 'Destacado' }] },
+        disciplina: []
+      }, {
+        datosPersonales: {
+          nombre: 'María',
+          apellido: 'Gómez',
+          dni: '30654321',
+          fechaNac: '1985-09-23',
+          domicilio: 'Calle Corrientes 567, CABA',
+          codigoPostal: '1001',
+          telefono: '+54 9 11 9876-5432',
+          email: 'maria.gomez@seguridad.com',
+          estadoCivil: 'Casada',
+          nombreMadre: 'Ana Gómez',
+          nombrePadre: 'Carlos Gómez',
+          foto: ''
+        },
+        habilitaciones: { tipo: 'Matrícula', numero: 'M-98765', fechaVenc: '2025-11-30',
+          organismo: 'Ministerio de Justicia' },
+        datosLaborales: {
+          legajo: '002',
+          fechaIngreso: '2018-07-01',
+          categoria: 'Supervisor',
+          horario: 'L-V 16:00-00:00',
+          obraSocial: 'Swiss Medical',
+          sindicato: 'SUTEP',
+          cuil: '27-30654321-9',
+          banco: 'Banco Galicia',
+          numCuenta: '987654321',
+          cbu: '9876543210987654321098'
+        },
+        ropa: { tallaCamisa: 'M', tallaPantalon: '38', tallaCalzado: '38', entregas: [{ fecha: '2023-12-05',
+            tipo: 'Camisa' }, { fecha: '2024-03-20', tipo: 'Pantalón' }] },
+        rrhh: { observaciones: 'Buena liderazgo.', evaluaciones: [{ fecha: '2023-12-10', nota: 'Sobresaliente' }] },
+        disciplina: []
+      }];
+
+      // ---------- DOM REFS ----------
+      const $ = (id) => document.getElementById(id);
+      const toastContainer = $('toastContainer');
+      const listaVigilantes = $('listaVigilantes');
+      const spinnerLista = $('spinnerLista');
+      const spinnerGlobal = $('spinnerGlobal');
+      const modalOverlay = $('modalOverlay');
+      const modalImportarOverlay = $('modalImportarOverlay');
+      const modalImportarSuspensionesOverlay = $('modalImportarSuspensionesOverlay');
+      const modalTitulo = $('modalTitulo');
+      const btnAgregar = $('btnAgregar');
+      const btnImportar = $('btnImportar');
+      const btnImportarSuspensiones = $('btnImportarSuspensiones');
+      const btnCerrarModal = $('btnCerrarModal');
+      const btnCancelarModal = $('btnCancelarModal');
+      const btnGuardarModal = $('btnGuardarModal');
+      const buscadorInput = $('buscadorInput');
+      const btnLimpiarBusqueda = $('btnLimpiarBusqueda');
+      const btnToggleFiltros = $('btnToggleFiltros');
+      const panelFiltros = $('panelFiltros');
+      const btnAplicarFiltros = $('btnAplicarFiltros');
+
+      // Filtros
+      const filtroTipoHab = $('filtroTipoHab');
+      const filtroNumHab = $('filtroNumHab');
+      const filtroOrganismo = $('filtroOrganismo');
+      const filtroVencDesde = $('filtroVencDesde');
+      const filtroVencHasta = $('filtroVencHasta');
+      const filtroCategoria = $('filtroCategoria');
+      const filtroObraSocial = $('filtroObraSocial');
+      const filtroSindicato = $('filtroSindicato');
+      const filtroBanco = $('filtroBanco');
+      const filtroCUIL = $('filtroCUIL');
+      const filtroTallaCamisa = $('filtroTallaCamisa');
+      const filtroTallaPantalon = $('filtroTallaPantalon');
+      const filtroTallaCalzado = $('filtroTallaCalzado');
+      const filtroTipoPrenda = $('filtroTipoPrenda');
+      const filtroEntregaDesde = $('filtroEntregaDesde');
+      const filtroEntregaHasta = $('filtroEntregaHasta');
+      const filtroObservaciones = $('filtroObservaciones');
+      const filtroEvaluaciones = $('filtroEvaluaciones');
+
+      // Campos del formulario
+      const inputNombre = $('inputNombre');
+      const inputApellido = $('inputApellido');
+      const inputDNI = $('inputDNI');
+      const inputFechaNac = $('inputFechaNac');
+      const inputDomicilio = $('inputDomicilio');
+      const inputCodigoPostal = $('inputCodigoPostal');
+      const inputTelefono = $('inputTelefono');
+      const inputEmail = $('inputEmail');
+      const inputEstadoCivil = $('inputEstadoCivil');
+      const inputNombreMadre = $('inputNombreMadre');
+      const inputNombrePadre = $('inputNombrePadre');
+      const inputFoto = $('inputFoto');
+      const fotoPreview = $('fotoPreview');
+      const btnSeleccionarFoto = $('btnSeleccionarFoto');
+      const btnQuitarFoto = $('btnQuitarFoto');
+
+      const inputTipoHabilitacion = $('inputTipoHabilitacion');
+      const inputNumHabilitacion = $('inputNumHabilitacion');
+      const inputFechaVencHabilitacion = $('inputFechaVencHabilitacion');
+      const inputOrganismo = $('inputOrganismo');
+
+      const inputLegajo = $('inputLegajo');
+      const inputFechaIngreso = $('inputFechaIngreso');
+      const inputCategoria = $('inputCategoria');
+      const inputHorario = $('inputHorario');
+      const inputObraSocial = $('inputObraSocial');
+      const inputSindicato = $('inputSindicato');
+      const inputCUIL = $('inputCUIL');
+      const inputBanco = $('inputBanco');
+      const inputNumCuenta = $('inputNumCuenta');
+      const inputCBU = $('inputCBU');
+
+      const inputTallaCamisa = $('inputTallaCamisa');
+      const inputTallaPantalon = $('inputTallaPantalon');
+      const inputTallaCalzado = $('inputTallaCalzado');
+      const listaEntregas = $('listaEntregas');
+      const inputEntregaFecha = $('inputEntregaFecha');
+      const inputEntregaTipo = $('inputEntregaTipo');
+      const btnAgregarEntrega = $('btnAgregarEntrega');
+
+      const inputObservaciones = $('inputObservaciones');
+      const listaEvaluaciones = $('listaEvaluaciones');
+      const inputEvalFecha = $('inputEvalFecha');
+      const inputEvalNota = $('inputEvalNota');
+      const btnAgregarEvaluacion = $('btnAgregarEvaluacion');
+
+      const disciplinaLista = $('disciplinaLista');
+      const inputSanFecha = $('inputSanFecha');
+      const inputSanDias = $('inputSanDias');
+      const inputSanServicio = $('inputSanServicio');
+      const inputSanMotivo = $('inputSanMotivo');
+      const btnAgregarSancion = $('btnAgregarSancion');
+
+      // Importación Altas
+      const fileInputAltas = $('fileInputAltas');
+      const btnProcesarAltas = $('btnProcesarAltas');
+      const btnConfirmarImportarAltas = $('btnConfirmarImportarAltas');
+      const btnCancelarImportarAltas = $('btnCancelarImportarAltas');
+      const btnCerrarImportar = $('btnCerrarImportar');
+      const importPreviewAltas = $('importPreviewAltas');
+      const importResumenAltas = $('importResumenAltas');
+
+      // Importación Suspensiones
+      const fileInputSuspensiones = $('fileInputSuspensiones');
+      const btnProcesarSuspensiones = $('btnProcesarSuspensiones');
+      const btnConfirmarImportarSuspensiones = $('btnConfirmarImportarSuspensiones');
+      const btnCancelarImportarSuspensiones = $('btnCancelarImportarSuspensiones');
+      const btnCerrarImportarSuspensiones = $('btnCerrarImportarSuspensiones');
+      const importPreviewSuspensiones = $('importPreviewSuspensiones');
+      const importResumenSuspensiones = $('importResumenSuspensiones');
+
+      // ---------- ESTADO ----------
+      let vigilanteEditandoId = null;
+      let entregasTemp = [];
+      let evaluacionesTemp = [];
+      let sancionesTemp = [];
+      let fotoDataURL = '';
+      let todosLosVigilantes = [];
+
+      // ---------- UTILIDADES ----------
+      function escapeHtml(text) {
+        if (!text) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+      }
+
+      function formatearDNI(dni) {
+        const num = dni.replace(/\D/g, '');
+        if (num.length <= 2) return num;
+        if (num.length <= 5) return num.replace(/(\d{2})(\d{1,3})/, '$1.$2');
+        if (num.length <= 8) return num.replace(/(\d{2})(\d{3})(\d{1,3})/, '$1.$2.$3');
+        return num.replace(/(\d{2})(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3.$4');
+      }
+
+      function normalizarDNI(dni) {
+        return dni.replace(/\D/g, '');
+      }
+
+      function mostrarToast(mensaje, tipo = 'exito') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipo}`;
+        const icono = tipo === 'error' ? '❌' : '✅';
+        toast.innerHTML = `
+              <span class="toast-icon">${icono}</span>
+              <span class="toast-msg">${escapeHtml(mensaje)}</span>
+              <button class="toast-close">&times;</button>
+            `;
+        toast.querySelector('.toast-close').addEventListener('click', function() { toast.remove(); });
+        toastContainer.appendChild(toast);
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 5000);
+      }
+
+      function mostrarSpinnerGlobal(visible) { spinnerGlobal.classList.toggle('visible', visible); }
+      function mostrarSpinnerLista(visible) { spinnerLista.classList.toggle('visible', visible); }
+      function setGuardando(guardando) {
+        btnGuardarModal.disabled = guardando;
+        btnGuardarModal.textContent = guardando ? 'Guardando...' : 'Guardar';
+      }
+
+      // ---------- FUNCIONES DE FIREBASE ----------
+
+      // Obtener todos los vigilantes de Firestore
+      async function obtenerVigilantes() {
+        const snapshot = await db.collection('vigilantes').orderBy('datosPersonales.apellido').get();
+        const vigilantes = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          data.id = doc.id; // guardamos el ID de Firestore
+          vigilantes.push(data);
+        });
+        return vigilantes;
+      }
+
+      // Agregar un nuevo vigilante
+      async function agregarVigilante(vigilante) {
+        const docRef = await db.collection('vigilantes').add(vigilante);
+        return docRef.id;
+      }
+
+      // Actualizar un vigilante existente
+      async function actualizarVigilante(vigilante) {
+        const id = vigilante.id;
+        delete vigilante.id; // quitamos el id para no enviarlo al documento
+        await db.collection('vigilantes').doc(id).update(vigilante);
+        vigilante.id = id; // lo restauramos
+      }
+
+      // Eliminar un vigilante
+      async function eliminarVigilante(id) {
+        await db.collection('vigilantes').doc(id).delete();
+      }
+
+      // Buscar por DNI (único)
+      async function buscarPorDNI(dni) {
+        const snapshot = await db.collection('vigilantes').where('datosPersonales.dni', '==', dni).get();
+        if (!snapshot.empty) {
+          const doc = snapshot.docs[0];
+          const data = doc.data();
+          data.id = doc.id;
+          return data;
+        }
+        return null;
+      }
+
+      // ---------- FILTROS ----------
+      function aplicarFiltros() {
+        const texto = buscadorInput.value.trim().toLowerCase();
+        const filtroNombre = (vig) => {
+          if (!texto) return true;
+          const nombreCompleto = (vig.datosPersonales.nombre + ' ' + vig.datosPersonales.apellido + ' ' + vig
+            .datosPersonales.dni).toLowerCase();
+          return nombreCompleto.includes(texto);
+        };
+
+        const filtroHab = (vig) => {
+          const hab = vig.habilitaciones || {};
+          if (filtroTipoHab.value && hab.tipo !== filtroTipoHab.value) return false;
+          if (filtroNumHab.value && !hab.numero?.toLowerCase().includes(filtroNumHab.value.toLowerCase()))
+            return false;
+          if (filtroOrganismo.value && !hab.organismo?.toLowerCase().includes(filtroOrganismo.value
+              .toLowerCase())) return false;
+          if (filtroVencDesde.value && hab.fechaVenc && hab.fechaVenc < filtroVencDesde.value) return false;
+          if (filtroVencHasta.value && hab.fechaVenc && hab.fechaVenc > filtroVencHasta.value) return false;
+          return true;
+        };
+
+        const filtroLab = (vig) => {
+          const lab = vig.datosLaborales || {};
+          if (filtroCategoria.value && lab.categoria !== filtroCategoria.value) return false;
+          if (filtroObraSocial.value && !lab.obraSocial?.toLowerCase().includes(filtroObraSocial.value
+              .toLowerCase())) return false;
+          if (filtroSindicato.value && !lab.sindicato?.toLowerCase().includes(filtroSindicato.value
+              .toLowerCase())) return false;
+          if (filtroBanco.value && !lab.banco?.toLowerCase().includes(filtroBanco.value.toLowerCase()))
+            return false;
+          if (filtroCUIL.value && !lab.cuil?.toLowerCase().includes(filtroCUIL.value.toLowerCase()))
+            return false;
+          return true;
+        };
+
+        const filtroRopa = (vig) => {
+          const ropa = vig.ropa || {};
+          if (filtroTallaCamisa.value && ropa.tallaCamisa?.toLowerCase() !== filtroTallaCamisa.value
+              .toLowerCase()) return false;
+          if (filtroTallaPantalon.value && ropa.tallaPantalon?.toLowerCase() !== filtroTallaPantalon.value
+              .toLowerCase()) return false;
+          if (filtroTallaCalzado.value && ropa.tallaCalzado?.toLowerCase() !== filtroTallaCalzado.value
+              .toLowerCase()) return false;
+          const entregas = ropa.entregas || [];
+          if (filtroTipoPrenda.value) {
+            const tipo = filtroTipoPrenda.value.toLowerCase();
+            if (!entregas.some(e => e.tipo.toLowerCase().includes(tipo))) return false;
+          }
+          if (filtroEntregaDesde.value || filtroEntregaHasta.value) {
+            const desde = filtroEntregaDesde.value;
+            const hasta = filtroEntregaHasta.value;
+            const tieneEntrega = entregas.some(e => {
+              if (desde && e.fecha < desde) return false;
+              if (hasta && e.fecha > hasta) return false;
+              return true;
+            });
+            if (!tieneEntrega) return false;
+          }
+          return true;
+        };
+
+        const filtroRRHH = (vig) => {
+          const rrhh = vig.rrhh || {};
+          if (filtroObservaciones.value && !rrhh.observaciones?.toLowerCase().includes(filtroObservaciones
+              .value.toLowerCase())) return false;
+          if (filtroEvaluaciones.value) {
+            const evalText = (rrhh.evaluaciones || []).map(e => e.nota).join(' ').toLowerCase();
+            if (!evalText.includes(filtroEvaluaciones.value.toLowerCase())) return false;
+          }
+          return true;
+        };
+
+        const filtrados = todosLosVigilantes.filter(vig => {
+          return filtroNombre(vig) && filtroHab(vig) && filtroLab(vig) && filtroRopa(vig) && filtroRRHH(vig);
+        });
+
+        renderLista(filtrados);
+      }
+
+      function renderLista(vigilantes) {
+        if (vigilantes.length === 0) {
+          listaVigilantes.innerHTML = `<div class="sin-datos">No se encontraron resultados.</div>`;
+          return;
+        }
+
+        let html = '';
+        for (const vig of vigilantes) {
+          const nombreMostrado = vig.datosPersonales.apellido ?
+            `${escapeHtml(vig.datosPersonales.apellido)}, ${escapeHtml(vig.datosPersonales.nombre)}` :
+            escapeHtml(vig.datosPersonales.nombre);
+          const dni = escapeHtml(formatearDNI(vig.datosPersonales.dni));
+          const foto = vig.datosPersonales.foto || '';
+          const avatar = foto ? `<img class="avatar-mini" src="${foto}" alt="foto">` :
+            `<div class="avatar-mini" style="display:flex;align-items:center;justify-content:center;background:#d1d9e6;color:#4a5a6e;font-weight:bold;">${escapeHtml(vig.datosPersonales.nombre[0])}${escapeHtml(vig.datosPersonales.apellido ? vig.datosPersonales.apellido[0] : '')}</div>`;
+          const sancionesCount = (vig.disciplina || []).length;
+          const badge = sancionesCount > 0 ? `<span class="sanciones-badge">${sancionesCount} sanción(es)</span>` :
+            '';
+          html += `
+                <div class="item-vigilante" data-id="${vig.id}">
+                    ${avatar}
+                    <div class="info">
+                        <span class="nombre">${nombreMostrado}</span>
+                        <span class="dni">DNI: ${dni}</span>
+                        ${badge}
+                    </div>
+                    <div class="acciones">
+                        <button class="btn-editar" data-id="${vig.id}" aria-label="Editar">✏️</button>
+                        <button class="btn-eliminar" data-id="${vig.id}" aria-label="Eliminar">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }
+        listaVigilantes.innerHTML = html;
+      }
+
+      // ---------- CARGA INICIAL ----------
+      async function cargarDatos() {
+        mostrarSpinnerLista(true);
+        try {
+          todosLosVigilantes = await obtenerVigilantes();
+          // Si no hay datos, cargar los de ejemplo
+          if (todosLosVigilantes.length === 0) {
+            for (const vig of DATOS_EJEMPLO) {
+              await agregarVigilante(vig);
+            }
+            todosLosVigilantes = await obtenerVigilantes();
+          }
+          aplicarFiltros();
+        } catch (err) {
+          console.error('Error al cargar datos:', err);
+          mostrarToast('Error al cargar los datos: ' + err.message, 'error');
+        } finally {
+          mostrarSpinnerLista(false);
+        }
+      }
+
+      // ---------- MODAL DE EDICIÓN ----------
+      function limpiarFormulario() {
+        const campos = [
+          inputNombre, inputApellido, inputDNI, inputFechaNac,
+          inputDomicilio, inputCodigoPostal, inputTelefono, inputEmail,
+          inputEstadoCivil, inputNombreMadre, inputNombrePadre,
+          inputTipoHabilitacion, inputNumHabilitacion,
+          inputFechaVencHabilitacion, inputOrganismo,
+          inputLegajo, inputFechaIngreso, inputCategoria, inputHorario,
+          inputObraSocial, inputSindicato, inputCUIL, inputBanco, inputNumCuenta, inputCBU,
+          inputTallaCamisa, inputTallaPantalon, inputTallaCalzado,
+          inputObservaciones
+        ];
+        campos.forEach(c => c.value = '');
+        inputTipoHabilitacion.value = 'Legajo PS';
+        inputCategoria.value = 'Vigilador';
+        entregasTemp = [];
+        evaluacionesTemp = [];
+        sancionesTemp = [];
+        fotoDataURL = '';
+        fotoPreview.src = '';
+        inputFoto.value = '';
+        renderEntregas();
+        renderEvaluaciones();
+        renderSanciones();
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
+        document.querySelector('[data-tab="tabPersonal"]').classList.add('activo');
+        document.querySelector('#tabPersonal').classList.add('activo');
+        setGuardando(false);
+      }
+
+      function cargarDatosEnFormulario(vigilante) {
+        const dp = vigilante.datosPersonales;
+        inputNombre.value = dp.nombre || '';
+        inputApellido.value = dp.apellido || '';
+        inputDNI.value = dp.dni || '';
+        inputFechaNac.value = dp.fechaNac || '';
+        inputDomicilio.value = dp.domicilio || '';
+        inputCodigoPostal.value = dp.codigoPostal || '';
+        inputTelefono.value = dp.telefono || '';
+        inputEmail.value = dp.email || '';
+        inputEstadoCivil.value = dp.estadoCivil || '';
+        inputNombreMadre.value = dp.nombreMadre || '';
+        inputNombrePadre.value = dp.nombrePadre || '';
+        fotoDataURL = dp.foto || '';
+        fotoPreview.src = fotoDataURL || '';
+
+        const hab = vigilante.habilitaciones || {};
+        inputTipoHabilitacion.value = hab.tipo || 'Legajo PS';
+        inputNumHabilitacion.value = hab.numero || '';
+        inputFechaVencHabilitacion.value = hab.fechaVenc || '';
+        inputOrganismo.value = hab.organismo || '';
+
+        const lab = vigilante.datosLaborales || {};
+        inputLegajo.value = lab.legajo || '';
+        inputFechaIngreso.value = lab.fechaIngreso || '';
+        inputCategoria.value = lab.categoria || 'Vigilador';
+        inputHorario.value = lab.horario || '';
+        inputObraSocial.value = lab.obraSocial || '';
+        inputSindicato.value = lab.sindicato || '';
+        inputCUIL.value = lab.cuil || '';
+        inputBanco.value = lab.banco || '';
+        inputNumCuenta.value = lab.numCuenta || '';
+        inputCBU.value = lab.cbu || '';
+
+        const ropa = vigilante.ropa || {};
+        inputTallaCamisa.value = ropa.tallaCamisa || '';
+        inputTallaPantalon.value = ropa.tallaPantalon || '';
+        inputTallaCalzado.value = ropa.tallaCalzado || '';
+        entregasTemp = (ropa.entregas || []).map(e => ({ ...e }));
+        renderEntregas();
+
+        const rrhh = vigilante.rrhh || {};
+        inputObservaciones.value = rrhh.observaciones || '';
+        evaluacionesTemp = (rrhh.evaluaciones || []).map(e => ({ ...e }));
+        renderEvaluaciones();
+
+        sancionesTemp = (vigilante.disciplina || []).map(s => ({ ...s }));
+        renderSanciones();
+      }
+
+      function recolectarDatosFormulario() {
+        const dniNormalizado = normalizarDNI(inputDNI.value);
+        const dp = {
+          nombre: inputNombre.value.trim(),
+          apellido: inputApellido.value.trim(),
+          dni: dniNormalizado,
+          fechaNac: inputFechaNac.value,
+          domicilio: inputDomicilio.value.trim(),
+          codigoPostal: inputCodigoPostal.value.trim(),
+          telefono: inputTelefono.value.trim(),
+          email: inputEmail.value.trim(),
+          estadoCivil: inputEstadoCivil.value.trim(),
+          nombreMadre: inputNombreMadre.value.trim(),
+          nombrePadre: inputNombrePadre.value.trim(),
+          foto: fotoDataURL
+        };
+        const hab = {
+          tipo: inputTipoHabilitacion.value,
+          numero: inputNumHabilitacion.value.trim(),
+          fechaVenc: inputFechaVencHabilitacion.value,
+          organismo: inputOrganismo.value.trim()
+        };
+        const lab = {
+          legajo: inputLegajo.value.trim(),
+          fechaIngreso: inputFechaIngreso.value,
+          categoria: inputCategoria.value,
+          horario: inputHorario.value.trim(),
+          obraSocial: inputObraSocial.value.trim(),
+          sindicato: inputSindicato.value.trim(),
+          cuil: inputCUIL.value.trim(),
+          banco: inputBanco.value.trim(),
+          numCuenta: inputNumCuenta.value.trim(),
+          cbu: inputCBU.value.trim()
+        };
+        const ropa = {
+          tallaCamisa: inputTallaCamisa.value.trim(),
+          tallaPantalon: inputTallaPantalon.value.trim(),
+          tallaCalzado: inputTallaCalzado.value.trim(),
+          entregas: entregasTemp.map(e => ({ ...e }))
+        };
+        const rrhh = {
+          observaciones: inputObservaciones.value.trim(),
+          evaluaciones: evaluacionesTemp.map(e => ({ ...e }))
+        };
+        const disciplina = sancionesTemp.map(s => ({ ...s }));
+        return { datosPersonales: dp, habilitaciones: hab, datosLaborales: lab, ropa, rrhh, disciplina };
+      }
+
+      function validarFormulario() {
+        const nombre = inputNombre.value.trim();
+        const apellido = inputApellido.value.trim();
+        const dni = normalizarDNI(inputDNI.value);
+        if (!nombre || !apellido || !dni) {
+          mostrarToast('Nombre, Apellido y DNI (solo números) son obligatorios.', 'error');
+          return false;
+        }
+        if (!/^\d{7,8}$/.test(dni)) {
+          mostrarToast('DNI debe tener 7 u 8 dígitos (sin puntos).', 'error');
+          return false;
+        }
+        const email = inputEmail.value.trim();
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          mostrarToast('Email inválido.', 'error');
+          return false;
+        }
+        const fechaNac = inputFechaNac.value;
+        if (fechaNac) {
+          const hoy = new Date();
+          const nac = new Date(fechaNac);
+          if (nac > hoy) {
+            mostrarToast('La fecha de nacimiento no puede ser futura.', 'error');
+            return false;
+          }
+        }
+        return true;
+      }
+
+      async function guardarVigilante() {
+        if (!validarFormulario()) return;
+        const datos = recolectarDatosFormulario();
+        const dni = datos.datosPersonales.dni;
+        try {
+          const existente = await buscarPorDNI(dni);
+          if (existente && existente.id !== vigilanteEditandoId) {
+            mostrarToast('Ya existe un vigilador con ese DNI.', 'error');
+            return;
+          }
+        } catch (err) {
+          mostrarToast('Error al verificar DNI: ' + err.message, 'error');
+          return;
+        }
+
+        setGuardando(true);
+        mostrarSpinnerGlobal(true);
+        try {
+          if (vigilanteEditandoId === null) {
+            const newId = await agregarVigilante(datos);
+            mostrarToast('Vigilador agregado correctamente.', 'exito');
+          } else {
+            // Para actualizar, necesitamos el ID del documento
+            const vigActualizado = { id: vigilanteEditandoId, ...datos };
+            await actualizarVigilante(vigActualizado);
+            mostrarToast('Vigilador actualizado correctamente.', 'exito');
+          }
+          cerrarModal();
+          await cargarDatos();
+        } catch (err) {
+          console.error('Error al guardar:', err);
+          mostrarToast('Error al guardar: ' + err.message, 'error');
+        } finally {
+          setGuardando(false);
+          mostrarSpinnerGlobal(false);
+        }
+      }
+
+      function cerrarModal() {
+        modalOverlay.classList.remove('visible');
+        vigilanteEditandoId = null;
+        document.body.style.overflow = 'auto';
+        setGuardando(false);
+      }
+
+      function abrirModalNuevo() {
+        limpiarFormulario();
+        vigilanteEditandoId = null;
+        modalTitulo.textContent = '➕ Nuevo Vigilador';
+        modalOverlay.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => inputNombre.focus(), 200);
+      }
+
+      async function abrirModalEditar(id) {
+        try {
+          const vigilante = todosLosVigilantes.find(v => v.id === id);
+          if (!vigilante) {
+            mostrarToast('Vigilador no encontrado.', 'error');
+            return;
+          }
+          limpiarFormulario();
+          cargarDatosEnFormulario(vigilante);
+          vigilanteEditandoId = id;
+          modalTitulo.textContent =
+            `✏️ Editando: ${escapeHtml(vigilante.datosPersonales.apellido)}, ${escapeHtml(vigilante.datosPersonales.nombre)}`;
+          modalOverlay.classList.add('visible');
+          document.body.style.overflow = 'hidden';
+        } catch (err) {
+          console.error('Error al cargar para editar:', err);
+          mostrarToast('Error al cargar los datos: ' + err.message, 'error');
+        }
+      }
+
+      // ---------- MANEJO DE LISTA ----------
+      function manejarClicLista(e) {
+        const target = e.target.closest('button');
+        if (!target) return;
+        const item = target.closest('.item-vigilante');
+        if (!item) return;
+        const id = item.dataset.id;
+        if (target.classList.contains('btn-editar')) {
+          e.stopPropagation();
+          abrirModalEditar(id);
+        } else if (target.classList.contains('btn-eliminar')) {
+          e.stopPropagation();
+          if (confirm('¿Está seguro de eliminar este vigilador?')) {
+            eliminarVigilantePorId(id);
+          }
+        }
+      }
+
+      async function eliminarVigilantePorId(id) {
+        try {
+          await eliminarVigilante(id);
+          mostrarToast('Vigilador eliminado correctamente.', 'exito');
+          await cargarDatos();
+        } catch (err) {
+          console.error('Error al eliminar:', err);
+          mostrarToast('Error al eliminar: ' + err.message, 'error');
+        }
+      }
+
+      // ---------- TABS ----------
+      function initTabs() {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const tabId = this.dataset.tab;
+            document.querySelectorAll('.tab-btn').forEach(b => {
+              b.classList.remove('activo');
+              b.setAttribute('aria-selected', 'false');
+            });
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
+            this.classList.add('activo');
+            this.setAttribute('aria-selected', 'true');
+            document.getElementById(tabId).classList.add('activo');
+          });
+        });
+      }
+
+      // ---------- ENTREGAS Y EVALUACIONES ----------
+      function renderEntregas() {
+        if (entregasTemp.length === 0) {
+          listaEntregas.innerHTML =
+            `<div class="sin-datos" style="font-size:0.9rem; padding:0.5rem;">Sin entregas registradas.</div>`;
+          return;
+        }
+        let html = '';
+        entregasTemp.forEach((e, index) => {
+          html += `
+                    <div class="sub-item">
+                        <span>${escapeHtml(e.fecha)} - ${escapeHtml(e.tipo)}</span>
+                        <button class="btn-remover" data-index="${index}" data-tipo="entrega" aria-label="Remover entrega">✖</button>
+                    </div>
+                `;
+        });
+        listaEntregas.innerHTML = html;
+        listaEntregas.querySelectorAll('.btn-remover').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const index = Number(this.dataset.index);
+            entregasTemp.splice(index, 1);
+            renderEntregas();
+          });
+        });
+      }
+
+      function renderEvaluaciones() {
+        if (evaluacionesTemp.length === 0) {
+          listaEvaluaciones.innerHTML =
+            `<div class="sin-datos" style="font-size:0.9rem; padding:0.5rem;">Sin evaluaciones registradas.</div>`;
+          return;
+        }
+        let html = '';
+        evaluacionesTemp.forEach((e, index) => {
+          html += `
+                    <div class="sub-item">
+                        <span>${escapeHtml(e.fecha)} - ${escapeHtml(e.nota)}</span>
+                        <button class="btn-remover" data-index="${index}" data-tipo="evaluacion" aria-label="Remover evaluación">✖</button>
+                    </div>
+                `;
+        });
+        listaEvaluaciones.innerHTML = html;
+        listaEvaluaciones.querySelectorAll('.btn-remover').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const index = Number(this.dataset.index);
+            evaluacionesTemp.splice(index, 1);
+            renderEvaluaciones();
+          });
+        });
+      }
+
+      function agregarEntrega() {
+        const fecha = inputEntregaFecha.value;
+        const tipo = inputEntregaTipo.value.trim();
+        if (!fecha || !tipo) {
+          mostrarToast('Complete fecha y tipo de entrega.', 'error');
+          return;
+        }
+        entregasTemp.push({ fecha, tipo });
+        renderEntregas();
+        inputEntregaFecha.value = '';
+        inputEntregaTipo.value = '';
+        inputEntregaFecha.focus();
+      }
+
+      function agregarEvaluacion() {
+        const fecha = inputEvalFecha.value;
+        const nota = inputEvalNota.value.trim();
+        if (!fecha || !nota) {
+          mostrarToast('Complete fecha y nota de evaluación.', 'error');
+          return;
+        }
+        evaluacionesTemp.push({ fecha, nota });
+        renderEvaluaciones();
+        inputEvalFecha.value = '';
+        inputEvalNota.value = '';
+        inputEvalFecha.focus();
+      }
+
+      // ---------- DISCIPLINA ----------
+      function renderSanciones() {
+        if (sancionesTemp.length === 0) {
+          disciplinaLista.innerHTML = `<div class="sin-datos">No hay sanciones registradas.</div>`;
+          return;
+        }
+        let html = `<table class="disciplina-table">
+                    <thead><tr><th>Fecha</th><th>Días</th><th>Servicio</th><th>Motivo</th><th>Acción</th></tr></thead><tbody>`;
+        sancionesTemp.forEach((s, index) => {
+          html += `
+                    <tr>
+                        <td>${escapeHtml(s.fecha || '')}</td>
+                        <td>${escapeHtml(s.dias || '')}</td>
+                        <td>${escapeHtml(s.servicio || '')}</td>
+                        <td>${escapeHtml(s.motivo || '')}</td>
+                        <td><button class="btn-eliminar-sancion" data-index="${index}" aria-label="Eliminar sanción">✖</button></td>
+                    </tr>
+                `;
+        });
+        html += `</tbody></table>`;
+        disciplinaLista.innerHTML = html;
+        disciplinaLista.querySelectorAll('.btn-eliminar-sancion').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const index = Number(this.dataset.index);
+            sancionesTemp.splice(index, 1);
+            renderSanciones();
+          });
+        });
+      }
+
+      function agregarSancion() {
+        const fecha = inputSanFecha.value;
+        const dias = inputSanDias.value.trim();
+        const servicio = inputSanServicio.value.trim();
+        const motivo = inputSanMotivo.value.trim();
+        if (!fecha || !motivo) {
+          mostrarToast('Fecha y motivo son obligatorios.', 'error');
+          return;
+        }
+        sancionesTemp.push({ fecha, dias, servicio, motivo });
+        renderSanciones();
+        inputSanFecha.value = '';
+        inputSanDias.value = '';
+        inputSanServicio.value = '';
+        inputSanMotivo.value = '';
+        inputSanFecha.focus();
+      }
+
+      // ---------- FOTO ----------
+      function manejarFoto(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          mostrarToast('Solo se permiten imágenes.', 'error');
+          inputFoto.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          fotoDataURL = ev.target.result;
+          fotoPreview.src = fotoDataURL;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function quitarFoto() {
+        fotoDataURL = '';
+        fotoPreview.src = '';
+        inputFoto.value = '';
+      }
+
+      // ---------- IMPORTACIÓN DE ALTAS (con Firebase) ----------
+      function abrirModalImportarAltas() {
+        modalImportarOverlay.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        fileInputAltas.value = '';
+        btnProcesarAltas.disabled = true;
+        btnConfirmarImportarAltas.style.display = 'none';
+        importResumenAltas.style.display = 'none';
+        importPreviewAltas.innerHTML = `<div class="sin-datos">Selecciona un archivo para previsualizar.</div>`;
+        window.datosImportadosAltas = null;
+      }
+
+      function cerrarModalImportarAltas() {
+        modalImportarOverlay.classList.remove('visible');
+        document.body.style.overflow = 'auto';
+      }
+
+      function formatearFecha(valor) {
+        if (!valor) return '';
+        if (typeof valor === 'number') {
+          const fecha = new Date((valor - 25569) * 86400 * 1000);
+          return fecha.toISOString().split('T')[0];
+        }
+        const str = String(valor).trim();
+        if (!str) return '';
+        const parts = str.split(/[\/\- ]/);
+        if (parts.length === 3) {
+          if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
+          else return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        }
+        return str;
+      }
+
+      function procesarArchivoAltas(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            let sheetName = workbook.SheetNames.find(name => name.trim().toUpperCase() === 'ALTAS');
+            if (!sheetName) sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            const allRows = [];
+            for (let r = range.s.r; r <= range.e.r; r++) {
+              const row = [];
+              for (let c = range.s.c; c <= range.e.c; c++) {
+                const addr = XLSX.utils.encode_cell({ r, c });
+                const cell = worksheet[addr];
+                row.push(cell ? String(cell.v).trim() : '');
+              }
+              allRows.push(row);
+            }
+
+            // Detectar encabezados
+            let headerRowIndex = -1;
+            let maxScore = 0;
+            const keywords = ['legajo', 'nombre', 'dni', 'apellido', 'cuil', 'fecha', 'alta', 'domicilio'];
+            for (let i = 0; i < allRows.length; i++) {
+              const rowText = allRows[i].join(' ').toLowerCase();
+              let score = 0;
+              for (const kw of keywords) {
+                if (rowText.includes(kw)) score++;
+              }
+              if (rowText.includes('dni') && rowText.includes('nombre')) score += 3;
+              if (rowText.includes('legajo')) score += 2;
+              if (score > maxScore) { maxScore = score;
+                headerRowIndex = i; }
+            }
+            if (headerRowIndex === -1 || maxScore < 3) {
+              mostrarToast('No se pudo identificar la fila de encabezados.', 'error');
+              return;
+            }
+
+            const headers = allRows[headerRowIndex];
+            console.log('Encabezados detectados:', headers);
+
+            function findCol(keywords) {
+              for (let i = 0; i < headers.length; i++) {
+                const h = headers[i].toLowerCase().trim();
+                for (const kw of keywords) {
+                  if (h.includes(kw.toLowerCase())) return i;
+                }
+              }
+              return -1;
+            }
+            const colMap = {
+              legajo: findCol(['legajo', 'nº legajo', 'n° legajo']),
+              nombreCompleto: findCol(['nombre y apellido', 'nombre completo', 'apellido y nombre']),
+              dni: findCol(['dni']),
+              cuil: findCol(['cuil']),
+              fechaNac: findCol(['f.nacimiento', 'fecha nacimiento', 'nacimiento']),
+              fechaIngreso: findCol(['fecha alta', 'alta']),
+              nombreMadre: findCol(['n. madre', 'madre']),
+              nombrePadre: findCol(['n. padre', 'padre']),
+              domicilio: findCol(['domicilio', 'dirección']),
+              codigoPostal: findCol(['c.p.', 'codigo postal', 'cp']),
+              telefono: findCol(['celular', 'telefono', 'teléfono']),
+              email: findCol(['mail', 'email']),
+              cbu: findCol(['cbu']),
+              numCuenta: findCol(['n° cuenta', 'nº cuenta', 'cuenta']),
+              banco: findCol(['banco']),
+              estadoCivil: findCol(['estado civil']),
+              obraSocial: findCol(['obra social', 'cod obra'])
+            };
+
+            if (colMap.nombreCompleto === -1 || colMap.dni === -1) {
+              mostrarToast('No se encontraron columnas "Nombre y Apellido" y/o "DNI".', 'error');
+              return;
+            }
+
+            const registros = [];
+            for (let i = headerRowIndex + 1; i < allRows.length; i++) {
+              const row = allRows[i];
+              const nombreCompleto = row[colMap.nombreCompleto] || '';
+              const dni = String(row[colMap.dni] || '').replace(/\D/g, '');
+              if (!nombreCompleto || !dni) continue;
+              let apellido = '',
+                nombre = '';
+              const partes = nombreCompleto.split(',').map(s => s.trim());
+              if (partes.length === 2) { apellido = partes[0];
+                nombre = partes[1]; } else { nombre = nombreCompleto; }
+
+              const getVal = (idx) => (idx !== -1) ? String(row[idx] || '').trim() : '';
+
+              const registro = {
+                datosPersonales: {
+                  nombre,
+                  apellido,
+                  dni,
+                  fechaNac: formatearFecha(getVal(colMap.fechaNac)),
+                  domicilio: getVal(colMap.domicilio),
+                  codigoPostal: getVal(colMap.codigoPostal),
+                  telefono: getVal(colMap.telefono),
+                  email: getVal(colMap.email),
+                  estadoCivil: getVal(colMap.estadoCivil),
+                  nombreMadre: getVal(colMap.nombreMadre),
+                  nombrePadre: getVal(colMap.nombrePadre),
+                  foto: ''
+                },
+                habilitaciones: { tipo: '', numero: '', fechaVenc: '', organismo: '' },
+                datosLaborales: {
+                  legajo: getVal(colMap.legajo),
+                  fechaIngreso: formatearFecha(getVal(colMap.fechaIngreso)),
+                  categoria: '',
+                  horario: '',
+                  obraSocial: getVal(colMap.obraSocial),
+                  sindicato: '',
+                  cuil: getVal(colMap.cuil),
+                  banco: getVal(colMap.banco),
+                  numCuenta: getVal(colMap.numCuenta),
+                  cbu: getVal(colMap.cbu)
+                },
+                ropa: { tallaCamisa: '', tallaPantalon: '', tallaCalzado: '', entregas: [] },
+                rrhh: { observaciones: '', evaluaciones: [] },
+                disciplina: []
+              };
+              registros.push(registro);
+            }
+
+            if (registros.length === 0) {
+              mostrarToast('No se encontraron datos válidos.', 'error');
+              return;
+            }
+
+            window.datosImportadosAltas = registros;
+            mostrarResumenAltas(registros);
+            btnConfirmarImportarAltas.style.display = 'inline-block';
+            btnConfirmarImportarAltas.disabled = false;
+
+          } catch (err) {
+            console.error('Error procesando Excel:', err);
+            mostrarToast('Error al procesar el archivo: ' + err.message, 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function mostrarResumenAltas(registros) {
+        importResumenAltas.style.display = 'flex';
+        importResumenAltas.innerHTML = `
+                <span>📄 Registros encontrados: <strong class="count">${registros.length}</strong></span>
+                <span>✅ Válidos: <strong class="count">${registros.length}</strong></span>
+            `;
+        let html = `<table><thead><tr><th>#</th><th>Apellido</th><th>Nombre</th><th>DNI</th><th>CUIL</th><th>F.Nac.</th><th>F.Ing.</th><th>Legajo</th><th>O.Social</th><th>Banco</th></tr></thead><tbody>`;
+        registros.slice(0, 5).forEach((r, i) => {
+          html += `<tr><td>${i+1}</td><td>${escapeHtml(r.datosPersonales.apellido)}</td><td>${escapeHtml(r.datosPersonales.nombre)}</td>
+                    <td>${escapeHtml(formatearDNI(r.datosPersonales.dni))}</td><td>${escapeHtml(r.datosLaborales.cuil)}</td>
+                    <td>${escapeHtml(r.datosPersonales.fechaNac)}</td><td>${escapeHtml(r.datosLaborales.fechaIngreso)}</td>
+                    <td>${escapeHtml(r.datosLaborales.legajo)}</td><td>${escapeHtml(r.datosLaborales.obraSocial)}</td>
+                    <td>${escapeHtml(r.datosLaborales.banco)}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+        if (registros.length > 5) html += `<div style="text-align:center;padding:0.5rem;">... y ${registros.length-5} más</div>`;
+        importPreviewAltas.innerHTML = html;
+      }
+
+      async function confirmarImportacionAltas() {
+        const registros = window.datosImportadosAltas;
+        if (!registros || registros.length === 0) {
+          mostrarToast('No hay datos para importar.', 'error');
+          return;
+        }
+
+        btnConfirmarImportarAltas.disabled = true;
+        btnConfirmarImportarAltas.textContent = 'Importando...';
+        mostrarSpinnerGlobal(true);
+
+        let importados = 0,
+          errores = 0;
+        try {
+          for (const vig of registros) {
+            try {
+              const existente = await buscarPorDNI(vig.datosPersonales.dni);
+              if (existente) { errores++; continue; }
+              await agregarVigilante(vig);
+              importados++;
+            } catch (err) {
+              console.error('Error guardando DNI ' + vig.datosPersonales.dni + ':', err);
+              errores++;
+            }
+          }
+          mostrarToast(`Importación completada: ${importados} agregados, ${errores} errores.`, 'exito');
+          cerrarModalImportarAltas();
+          await cargarDatos();
+        } catch (err) {
+          console.error('Error en importación:', err);
+          mostrarToast('Error en la importación: ' + err.message, 'error');
+        } finally {
+          btnConfirmarImportarAltas.disabled = false;
+          btnConfirmarImportarAltas.textContent = 'Confirmar importación';
+          mostrarSpinnerGlobal(false);
+        }
+      }
+
+      // ---------- IMPORTACIÓN DE SUSPENSIONES ----------
+      function abrirModalImportarSuspensiones() {
+        modalImportarSuspensionesOverlay.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        fileInputSuspensiones.value = '';
+        btnProcesarSuspensiones.disabled = true;
+        btnConfirmarImportarSuspensiones.style.display = 'none';
+        importResumenSuspensiones.style.display = 'none';
+        importPreviewSuspensiones.innerHTML = `<div class="sin-datos">Selecciona un archivo para previsualizar.</div>`;
+        window.datosImportadosSuspensiones = null;
+      }
+
+      function cerrarModalImportarSuspensiones() {
+        modalImportarSuspensionesOverlay.classList.remove('visible');
+        document.body.style.overflow = 'auto';
+      }
+
+      function procesarArchivoSuspensiones(file) {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetNames = workbook.SheetNames;
+            if (sheetNames.length === 0) {
+              mostrarToast('El archivo no contiene hojas.', 'error');
+              return;
+            }
+
+            // Obtener vigilantes existentes
+            const vigilantes = await obtenerVigilantes();
+            if (vigilantes.length === 0) {
+              mostrarToast('No hay vigilantes cargados. Importa primero las altas.', 'error');
+              return;
+            }
+
+            const resultados = [];
+            let totalSanciones = 0;
+            let noEncontrados = [];
+
+            for (const sheetName of sheetNames) {
+              const nombreHoja = sheetName.trim();
+              let vigilanteEncontrado = null;
+              const partesHoja = nombreHoja.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(' ');
+              for (const vig of vigilantes) {
+                const apellidoVig = vig.datosPersonales.apellido.toLowerCase().normalize('NFD').replace(
+                  /[\u0300-\u036f]/g, '');
+                const nombreVig = vig.datosPersonales.nombre.toLowerCase().normalize('NFD').replace(
+                  /[\u0300-\u036f]/g, '');
+                const nombreCompleto = apellidoVig + ' ' + nombreVig;
+                const todasCoinciden = partesHoja.every(p => nombreCompleto.includes(p));
+                if (todasCoinciden) { vigilanteEncontrado = vig; break; }
+                if (partesHoja.length >= 2) {
+                  const apellidoHoja = partesHoja[0];
+                  const nombreHojaResto = partesHoja.slice(1).join(' ');
+                  if (apellidoVig === apellidoHoja && nombreVig.includes(nombreHojaResto)) { vigilanteEncontrado =
+                      vig; break; }
+                }
+              }
+              if (!vigilanteEncontrado) { noEncontrados.push(nombreHoja); continue; }
+
+              const worksheet = workbook.Sheets[sheetName];
+              const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+              // Detectar fila de encabezados
+              let headerRowIndex = -1;
+              for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const rowText = row.join(' ').toLowerCase();
+                if (rowText.includes('fecha') && rowText.includes('motivo')) {
+                  headerRowIndex = i;
+                  break;
+                }
+              }
+              if (headerRowIndex === -1) {
+                console.warn('No se encontraron encabezados en hoja:', sheetName);
+                continue;
+              }
+
+              const headers = rows[headerRowIndex];
+              function findColIndex(keywords) {
+                for (let i = 0; i < headers.length; i++) {
+                  const h = String(headers[i]).toLowerCase().trim();
+                  for (const kw of keywords) {
+                    if (h.includes(kw.toLowerCase())) return i;
+                  }
+                }
+                return -1;
+              }
+              const colFecha = findColIndex(['fecha']);
+              const colDias = findColIndex(['dias', 'apercibimiento', 'cantidad']);
+              const colServicio = findColIndex(['servicio']);
+              const colMotivo = findColIndex(['motivo']);
+
+              if (colFecha === -1 || colMotivo === -1) {
+                console.warn('Columnas FECHA o MOTIVO no encontradas en hoja:', sheetName);
+                continue;
+              }
+
+              const sanciones = [];
+              for (let i = headerRowIndex + 1; i < rows.length; i++) {
+                const row = rows[i];
+                const fecha = row[colFecha] ? formatearFecha(row[colFecha]) : '';
+                const dias = colDias !== -1 ? String(row[colDias] || '').trim() : '';
+                const servicio = colServicio !== -1 ? String(row[colServicio] || '').trim() : '';
+                const motivo = row[colMotivo] ? String(row[colMotivo]).trim() : '';
+                if (fecha && motivo) {
+                  sanciones.push({ fecha, dias, servicio, motivo });
+                }
+              }
+
+              if (sanciones.length > 0) {
+                resultados.push({ vigilante: vigilanteEncontrado, sanciones });
+                totalSanciones += sanciones.length;
+              }
+            }
+
+            if (resultados.length === 0 && noEncontrados.length === sheetNames.length) {
+              mostrarToast('No se pudo asignar ninguna sanción. Verifica nombres de hojas.', 'error');
+              return;
+            }
+
+            window.datosImportadosSuspensiones = resultados;
+
+            importResumenSuspensiones.style.display = 'flex';
+            let resumenHtml =
+              `<span>📄 Sanciones encontradas: <strong class="count">${totalSanciones}</strong></span>`;
+            resumenHtml +=
+              `<span>👤 Vigilantes afectados: <strong class="count">${resultados.length}</strong></span>`;
+            if (noEncontrados.length > 0) {
+              resumenHtml +=
+                `<span style="color:#b91c1c;">⚠️ No encontrados: ${noEncontrados.join(', ')}</span>`;
+            }
+            importResumenSuspensiones.innerHTML = resumenHtml;
+
+            let previewHtml =
+              `<table><thead><tr><th>Vigilante</th><th>Cantidad</th><th>Ejemplo</th></tr></thead><tbody>`;
+            resultados.slice(0, 5).forEach(r => {
+              const nombre = `${r.vigilante.datosPersonales.apellido}, ${r.vigilante.datosPersonales.nombre}`;
+              const ejemplo = r.sanciones.length > 0 ?
+                `${r.sanciones[0].fecha} - ${r.sanciones[0].motivo.substring(0, 30)}...` : '';
+              previewHtml += `<tr><td>${escapeHtml(nombre)}</td><td>${r.sanciones.length}</td><td>${escapeHtml(ejemplo)}</td></tr>`;
+            });
+            previewHtml += `</tbody></table>`;
+            if (resultados.length > 5) previewHtml += `<div style="text-align:center;padding:0.5rem;">... y ${resultados.length-5} más</div>`;
+            importPreviewSuspensiones.innerHTML = previewHtml;
+
+            btnConfirmarImportarSuspensiones.style.display = 'inline-block';
+            btnConfirmarImportarSuspensiones.disabled = false;
+
+          } catch (err) {
+            console.error('Error procesando suspensiones:', err);
+            mostrarToast('Error al procesar suspensiones: ' + err.message, 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      async function confirmarImportacionSuspensiones() {
+        const resultados = window.datosImportadosSuspensiones;
+        if (!resultados || resultados.length === 0) {
+          mostrarToast('No hay datos para importar.', 'error');
+          return;
+        }
+
+        btnConfirmarImportarSuspensiones.disabled = true;
+        btnConfirmarImportarSuspensiones.textContent = 'Importando...';
+        mostrarSpinnerGlobal(true);
+
+        let totalAgregadas = 0;
+        try {
+          for (const item of resultados) {
+            try {
+              const vig = item.vigilante;
+              if (!vig.disciplina) vig.disciplina = [];
+              for (const s of item.sanciones) {
+                const yaExiste = vig.disciplina.some(ex => ex.fecha === s.fecha && ex.motivo === s.motivo);
+                if (!yaExiste) {
+                  vig.disciplina.push(s);
+                }
+              }
+              await actualizarVigilante(vig);
+              totalAgregadas += item.sanciones.length;
+            } catch (err) {
+              console.error('Error al guardar sanciones:', err);
+            }
+          }
+          mostrarToast(`Importación completada: ${totalAgregadas} sanciones agregadas.`, 'exito');
+          cerrarModalImportarSuspensiones();
+          await cargarDatos();
+        } catch (err) {
+          console.error('Error en importación de suspensiones:', err);
+          mostrarToast('Error: ' + err.message, 'error');
+        } finally {
+          btnConfirmarImportarSuspensiones.disabled = false;
+          btnConfirmarImportarSuspensiones.textContent = 'Confirmar importación';
+          mostrarSpinnerGlobal(false);
+        }
+      }
+
+      // ---------- INICIALIZACIÓN ----------
+      // Cargar datos automáticamente al iniciar
+      cargarDatos();
+
+      // ---------- EVENTOS ----------
+      btnAgregar.addEventListener('click', abrirModalNuevo);
+      btnImportar.addEventListener('click', abrirModalImportarAltas);
+      btnImportarSuspensiones.addEventListener('click', abrirModalImportarSuspensiones);
+      btnCerrarModal.addEventListener('click', cerrarModal);
+      btnCancelarModal.addEventListener('click', cerrarModal);
+      btnGuardarModal.addEventListener('click', guardarVigilante);
+      modalOverlay.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModal();
+      });
+
+      // Altas
+      btnCerrarImportar.addEventListener('click', cerrarModalImportarAltas);
+      btnCancelarImportarAltas.addEventListener('click', cerrarModalImportarAltas);
+      modalImportarOverlay.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalImportarAltas();
+      });
+      fileInputAltas.addEventListener('change', function() {
+        btnProcesarAltas.disabled = !this.files || this.files.length === 0;
+      });
+      btnProcesarAltas.addEventListener('click', function() {
+        if (!fileInputAltas.files || fileInputAltas.files.length === 0) return;
+        procesarArchivoAltas(fileInputAltas.files[0]);
+      });
+      btnConfirmarImportarAltas.addEventListener('click', confirmarImportacionAltas);
+
+      // Suspensiones
+      btnCerrarImportarSuspensiones.addEventListener('click', cerrarModalImportarSuspensiones);
+      btnCancelarImportarSuspensiones.addEventListener('click', cerrarModalImportarSuspensiones);
+      modalImportarSuspensionesOverlay.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalImportarSuspensiones();
+      });
+      fileInputSuspensiones.addEventListener('change', function() {
+        btnProcesarSuspensiones.disabled = !this.files || this.files.length === 0;
+      });
+      btnProcesarSuspensiones.addEventListener('click', function() {
+        if (!fileInputSuspensiones.files || fileInputSuspensiones.files.length === 0) return;
+        procesarArchivoSuspensiones(fileInputSuspensiones.files[0]);
+      });
+      btnConfirmarImportarSuspensiones.addEventListener('click', confirmarImportacionSuspensiones);
+
+      listaVigilantes.addEventListener('click', manejarClicLista);
+
+      btnAgregarEntrega.addEventListener('click', agregarEntrega);
+      btnAgregarEvaluacion.addEventListener('click', agregarEvaluacion);
+      inputEntregaTipo.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault();
+          agregarEntrega(); }
+      });
+      inputEvalNota.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault();
+          agregarEvaluacion(); }
+      });
+
+      btnAgregarSancion.addEventListener('click', agregarSancion);
+      inputSanMotivo.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault();
+          agregarSancion(); }
+      });
+
+      btnSeleccionarFoto.addEventListener('click', function() { inputFoto.click(); });
+      inputFoto.addEventListener('change', manejarFoto);
+      btnQuitarFoto.addEventListener('click', quitarFoto);
+
+      buscadorInput.addEventListener('input', aplicarFiltros);
+      btnLimpiarBusqueda.addEventListener('click', function() {
+        buscadorInput.value = '';
+        aplicarFiltros();
+      });
+      btnToggleFiltros.addEventListener('click', function() {
+        panelFiltros.classList.toggle('visible');
+        this.textContent = panelFiltros.classList.contains('visible') ? '✖ Ocultar filtros' :
+          '⚙️ Filtros avanzados';
+      });
+      btnAplicarFiltros.addEventListener('click', aplicarFiltros);
+
+      document.querySelectorAll('.panel-filtros input, .panel-filtros select').forEach(el => {
+        el.addEventListener('change', aplicarFiltros);
+        el.addEventListener('input', aplicarFiltros);
+      });
+
+      inputDNI.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '');
+      });
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          if (modalOverlay.classList.contains('visible')) cerrarModal();
+          if (modalImportarOverlay.classList.contains('visible')) cerrarModalImportarAltas();
+          if (modalImportarSuspensionesOverlay.classList.contains('visible')) cerrarModalImportarSuspensiones();
+        }
+      });
+
+      initTabs();
+
+      console.log('Aplicación con Firebase iniciada.');
+    })();
+  </script>
+</body>
+</html>
